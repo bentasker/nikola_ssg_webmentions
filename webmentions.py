@@ -138,11 +138,11 @@ class WebMentions(SignalHandler):
         If either is found (header takes precedence) then send a webmention to
         the specified endpoint
         '''
-
-        # Temporary:
-        dest = "https://www.bentasker.co.uk/posts/blog/opinion/removing-my-old-tweets.html"
         
-        # TODO: don't ping absolute links to own domain
+        # don't ping absolute links to own domain
+        if dest.startswith(self.site.config['SITE_URL']):
+            self.logger.info('Refusing to ping self for {0}'.format(dest))
+            return False
         
         # Skip relative links
         if not dest.startswith("http://") and not dest.startswith("https://"):
