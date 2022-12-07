@@ -78,6 +78,13 @@ class WebMentions(SignalHandler):
             link = post.permalink(absolute=True)
             text = post.text()
             self.logger.info('Processing {0}'.format(link))
+
+            # Calculate and retrieve the state-key for this URL
+            key = "webmention-info-{0}".format(link)
+            observed_links = self.site.state.get(key)
+            
+            if not observed_links:
+                observed_links = []
         
             # Extract links from within the rendered page
             links = self.extract_links(text)
@@ -91,7 +98,24 @@ class WebMentions(SignalHandler):
             
             # Send mentions for each
             for dest in links:
-                self.send_webmention(link, dest, session)
+                
+                # See whether a webmention's already been sent for this page and url
+                # means we won't reping links every time a post is updated
+                if dest in observed_links:
+                    continue
+                
+                sent, has_mentions = self.send_webmention(link, dest, session)
+                
+                # We want to cache two categories of link
+                #
+                # Has webmentions, sent successfully
+                # Does not have webmentions
+                
+                if sent or not has_mentions:
+                    observed_links.append(dest) 
+
+            # Now that all links have been processed, save the state
+            self.site.state.set(key, observed_links)
 
         
     def extract_links(self, post_text):
@@ -141,17 +165,17 @@ class WebMentions(SignalHandler):
         
         # don't ping absolute links to own domain
         if dest.startswith(self.site.config['SITE_URL']):
-            return False
+            return False, False
         
         # Skip relative links
         if not dest.startswith("http://") and not dest.startswith("https://"):
-            return False
+            return False, False
         
         # Check for a webmention endpoint
         ep = self.get_webmention_endpoint(dest, session)
         
         if not ep:
-            return False
+            return False, False
         
         # Now we actually send the webmention
         #
@@ -168,9 +192,9 @@ class WebMentions(SignalHandler):
         r = session.post(ep, data=data)
         if r.status_code not in [200, 201, 202, 204]:
             self.logger.info('Received {0}'.format(r.status_code))
-            return False
+            return False, True
         
-        return True
+        return True, True
     
     
     def get_webmention_endpoint(self, dest, session):
