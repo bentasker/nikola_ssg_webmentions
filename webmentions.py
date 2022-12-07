@@ -166,7 +166,7 @@ class WebMentions(SignalHandler):
         
         self.logger.info('Sending WebMention to {0} for {1}'.format(ep, dest))
         r = session.post(ep, data=data)
-        if r.status_code not in [200, 201, 204]:
+        if r.status_code not in [200, 201, 202, 204]:
             self.logger.info('Received {0}'.format(r.status_code))
             return False
         
