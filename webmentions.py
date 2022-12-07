@@ -43,9 +43,9 @@ class WebMentions(SignalHandler):
         self.logger = get_logger(self.name, STDERR_HANDLER)
 
         # Bind to the signal
-        ready = signal('compiled')
+        ready = signal('deployed')
         
-        # 
+        # Trigger analyse_posts when the signal's received
         ready.connect(self.analyse_posts)
         
         
@@ -53,25 +53,30 @@ class WebMentions(SignalHandler):
         '''
             We should get an event dict
             
-            Within that, there will be "post" which gives details of all posts that have been deployed
+            Within that, there will be deployed" which gives details of all posts that have been deployed
             
             Format of that object is here: https://nikola.readthedocs.io/en/latest/nikola.html#module-nikola.post
+            
+            Note: Nikola won't trigger this hook for posts with a Date (or Updated) that's before the last recorded deploy. So we won't end up re-sending webmentions if we make changes to an existing post.
+            
         '''
-        post = event["post"]
-        self.logger.error('Received {0}'.format(post))
         
-        title = post.title()
+        for post in event["deployed"]:      
+            self.logger.error('Received {0}'.format(post))
+            
+            title = post.title()
+            
+            if post.is_draft or post.post_status != "published":
+                # Don't send for drafts
+                self.logger.info('Skipping Draft Post {0} with status {1}'.format(title, post.post_status))
+                continue
+            
+            link = post.permalink(absolute=True)
+            text = post.text()
+            self.logger.info('Processing {0}'.format(link))
         
-        if post.is_draft or post.post_status != "published":
-            # Don't send for drafts
-            self.logger.info('Skipping Draft Post {0} with status {1}'.format(title, post.post_status))
-            return
-        
-        link = post.permalink(absolute=True)
-        text = post.text()
-        self.logger.info('Processing {0}'.format(link))
-        
-        
+            # Hard-work is "todo"
+            
         
         
         
