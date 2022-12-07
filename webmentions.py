@@ -184,6 +184,8 @@ class WebMentions(SignalHandler):
             - link headers
             - HTML meta tags (TODO)
         '''
+        
+        # Place a HEAD for the path
         r = session.head(dest)
         if r.status_code != 200:
             self.logger.info('Request to {0} failed'.format(dest))
@@ -197,8 +199,9 @@ class WebMentions(SignalHandler):
         # Note2: lookup is not case-sensitive: requests will accept "Link", "link", "lINk" etc
         if "link" not in r.headers:
             self.logger.info('No linky {0}'.format(dest))
-            return False
-        
+            
+            # Pass off to the HTML link extractor
+            return self.get_html_link(dest, session)
         
         # Need to see if any of the headers are for webmentions
         for link_h in r.headers["link"].split(","):
@@ -207,8 +210,50 @@ class WebMentions(SignalHandler):
                 # found one
                 self.logger.info('Found {0}'.format(mention_link))
                 return mention_link
+
+        # If we reached this point, there was no webmention header
+        # but, the spec also allows them in HTML meta-tags
+        #
+        #
+        # It's true that there's a call to this earlier
+        # but this isn't a mistake
+        # it may be that there were non-webmention link headers
+        return self.get_html_link(dest, r, session)
             
-        # TODO: check HTML meta tags
+            
+    def get_html_link(self, dest, session):
+        ''' Fetch a destination link and extra webmention tags if present
+        '''
+        # Fetch the link
+        r = session.get(dest)
+        if r.status_code != 200:
+            self.logger.info('GET Request to {0} failed'.format(dest))
+            return False
+
+        # ensure the linked dest *is* HTML
+        if "content-type" not in r.headers or "html" not in r.headers["content-type"].lower():
+            # Not HTML, don't bother
+            self.logger.info('Skip non-HTML {0}'.format(dest))
+            return False
+
+        # Feed into lxml
+        tree = html.fromstring(r.content.decode("utf-8"))
+        
+        # Look for relevant tags
+        #
+        # We need to look for link and a
+        # https://www.w3.org/TR/webmention/#sender-discovers-receiver-webmention-endpoint
+        #
+        # Must be ordered in document order, so we need to do it in one query :(
+        xpath_q = '(//link|//a)[contains(concat(" ", @rel, " "), " webmention ") or contains(@rel, "webmention.org")]'
+        
+        # Do it
+        for match in tree.xpath(xpath_q):
+            self.logger.info('Found {0}'.format(match.get('href')))
+            # Don't return empty values
+            if len(match.get('href')) > 0:
+                return match.get('href')
+        
         return False
         
     
@@ -219,7 +264,6 @@ class WebMentions(SignalHandler):
         regexes = [
             '<(.[^>]+)>;\s+rel\s?=\s?[\"\']?(http:\/\/)?webmention(\.org)?\/?[\"\']?'
             ]
-        
         
         if "webmention" not in header:
             return False
