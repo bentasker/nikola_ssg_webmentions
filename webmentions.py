@@ -24,6 +24,9 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import requests
+import re
+
 from blinker import signal
 from lxml import html
 
@@ -79,6 +82,16 @@ class WebMentions(SignalHandler):
             # Extract links from the rendered page
             links = self.extract_links(text)
             
+            # Set up a requests session so that HTTP keep-alives can be used where possible
+            # this reduces connection overhead etc
+            session = requests.session()
+            
+            # Set the user-agent for all requests in this session
+            session.headers.update({"User-Agent": "Nikola SSG WebMentions plugin"})
+            
+            # Send mentions for each
+            for dest in links:
+                self.send_webmention(link, dest, session)
             
         
         
@@ -113,4 +126,109 @@ class WebMentions(SignalHandler):
         return urls
         
 
+    def send_webmention(self, ownlink, dest, session):
+        ''' Send a webmention to a destination link
+        
+        This involves
+        
+        - Retrieving the link
+        - checking for rel=webmention in the response headers
+        - checking for rel=webmention in meta tags
+        
+        If either is found (header takes precedence) then send a webmention to
+        the specified endpoint
+        '''
 
+        # Temporary:
+        dest = "https://www.bentasker.co.uk/posts/blog/opinion/removing-my-old-tweets.html"
+        
+        # TODO: don't ping absolute links to own domain
+        
+        # Skip relative links
+        if not dest.startswith("http://") and not dest.startswith("https://"):
+            self.logger.info('Skipped relative dest {0}'.format(dest))
+            return False
+        
+        # Check for a webmention endpoint
+        ep = self.get_webmention_endpoint(dest, session)
+        
+        if not ep:
+            return False
+        
+        
+        # Now we actually send the webmention
+        #
+        # This is fairly simple, we're placing a form request with
+        #
+        # source = [our url]
+        # target = [linked url]
+        data = {
+                "source" : ownlink,
+                "target" : dest
+            }
+        
+        self.logger.info('Sending WebMention to {0}'.format(ep))
+        r = session.post(ep, data=data)
+        if r.status_code not in [200, 201, 204]:
+            self.logger.info('Received {0}'.format(r.status_code))
+            return False
+        
+        self.logger.info('Sending WebMention Succeeded')
+        return True
+    
+    
+    def get_webmention_endpoint(self, dest, session):
+        ''' Place a request to the linked target and 
+            look for information about webmentions 
+            
+            - link headers
+            - HTML meta tags (TODO)
+        '''
+        r = session.head(dest)
+        if r.status_code != 200:
+            self.logger.info('Request to {0} failed'.format(dest))
+            return False
+        
+        # See if there's a Link header. 
+        # 
+        # Note: if there are multiple (there often are), requests will have collapsed them into
+        # a single comma seperated entry
+        #
+        # Note2: lookup is not case-sensitive: requests will accept "Link", "link", "lINk" etc
+        if "link" not in r.headers:
+            self.logger.info('No linky {0}'.format(dest))
+            return False
+        
+        
+        # Need to see if any of the headers are for webmentions
+        for link_h in r.headers["link"].split(","):
+            mention_link = self.check_link_header_for_webmention(link_h)
+            if mention_link:
+                # found one
+                self.logger.info('Found {0}'.format(mention_link))
+                return mention_link
+            
+        # TODO: check HTML meta tags
+        return False
+        
+    
+    def check_link_header_for_webmention(self, header):
+        ''' Process a header and look for webmention related entries
+        '''
+        
+        regexes = [
+            '<(.[^>]+)>;\s+rel\s?=\s?[\"\']?(http:\/\/)?webmention(\.org)?\/?[\"\']?'
+            ]
+        
+        
+        if "webmention" not in header:
+            return False
+        
+        for regex in regexes:
+            m = re.search(regex, header, re.IGNORECASE)
+            if m:
+                return m.group(1)
+
+        # Must not have found anything
+        return False
+        
