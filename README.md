@@ -8,9 +8,11 @@ It can only *send* WebMentions, it cannot *receive* because doing so would requi
 
 ### Configuration and Usage
 
-The plugin simply needs to be installed.
+If you haven't run `deploy` before, you might want to consider doing so before installing the plugin, so that it doesn't try to retroactively send mentions for all your content.
 
-Once you've made changes to your site content:
+After that the plugin simply needs to be installed, copy the contents of this repo into `plugins/webmentions`
+
+When you next make changes to your site content:
 
 * run `nikola build`
 * run `nikola deploy` (you do not need to have defined any `DEPLOY_COMMANDS` in Nikola's config)
