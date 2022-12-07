@@ -25,6 +25,7 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from blinker import signal
+from lxml import html
 
 from nikola.utils import get_logger, STDERR_HANDLER
 from nikola.plugin_categories import SignalHandler
@@ -75,9 +76,39 @@ class WebMentions(SignalHandler):
             text = post.text()
             self.logger.info('Processing {0}'.format(link))
         
-            # Hard-work is "todo"
+            # Extract links from the rendered page
+            links = self.extract_links(text)
+            
             
         
         
+    def extract_links(self, post_text):
+        ''' Receive a HTML post, iterate through it looking for links out and extract the relevant URLs
         
+            return: list
+        '''
+        tree = html.fromstring(post_text)
         
+        # Map out element types and the attributes we're looking for
+        # keep it simple to begin with
+        #
+        attribs = {
+            "href" : ["a"]
+            }
+        
+        urls = []
+    
+        # Iterate over each attribute type
+        for attrib in attribs:
+            for element in attribs[attrib]:
+                xpath = "//{0}[@{1}]".format(element, attrib)
+                for match in tree.xpath(xpath):
+                    self.logger.info('Found {0}'.format(match.get('href')))
+                    urls.append(match.get('href'))
+        
+        # Make the list unique
+        urls = list(set(urls))
+        return urls
+        
+
+
