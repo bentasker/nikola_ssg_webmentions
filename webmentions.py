@@ -104,7 +104,9 @@ class WebMentions(SignalHandler):
                 xpath = "//{0}[@{1}]".format(element, attrib)
                 for match in tree.xpath(xpath):
                     self.logger.info('Found {0}'.format(match.get('href')))
-                    urls.append(match.get('href'))
+                    # Remove URL fragments
+                    u = match.get('href').split("#")[0]
+                    urls.append(u)
         
         # Make the list unique
         urls = list(set(urls))
