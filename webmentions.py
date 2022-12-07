@@ -87,7 +87,7 @@ class WebMentions(SignalHandler):
             session = requests.session()
             
             # Set the user-agent for all requests in this session
-            session.headers.update({"User-Agent": "Nikola SSG WebMentions plugin"})
+            session.headers.update({"User-Agent": "Nikola SSG Webmention plugin"})
             
             # Send mentions for each
             for dest in links:
