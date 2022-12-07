@@ -65,21 +65,21 @@ class WebMentions(SignalHandler):
             
         '''
         
+        # Iterate over each post listed in "deployed"
         for post in event["deployed"]:      
-            self.logger.error('Received {0}'.format(post))
-            
             title = post.title()
             
+            # Don't send for drafts
             if post.is_draft or post.post_status != "published":
-                # Don't send for drafts
                 self.logger.info('Skipping Draft Post {0} with status {1}'.format(title, post.post_status))
                 continue
             
+            # Extract some details
             link = post.permalink(absolute=True)
             text = post.text()
             self.logger.info('Processing {0}'.format(link))
         
-            # Extract links from the rendered page
+            # Extract links from within the rendered page
             links = self.extract_links(text)
             
             # Set up a requests session so that HTTP keep-alives can be used where possible
@@ -92,8 +92,7 @@ class WebMentions(SignalHandler):
             # Send mentions for each
             for dest in links:
                 self.send_webmention(link, dest, session)
-            
-        
+
         
     def extract_links(self, post_text):
         ''' Receive a HTML post, iterate through it looking for links out and extract the relevant URLs
@@ -105,6 +104,7 @@ class WebMentions(SignalHandler):
         # Map out element types and the attributes we're looking for
         # keep it simple to begin with
         #
+        # TODO: Add some
         attribs = {
             "href" : ["a"]
             }
@@ -114,9 +114,9 @@ class WebMentions(SignalHandler):
         # Iterate over each attribute type
         for attrib in attribs:
             for element in attribs[attrib]:
+                # Find elements of type element with attribute
                 xpath = "//{0}[@{1}]".format(element, attrib)
                 for match in tree.xpath(xpath):
-                    self.logger.info('Found {0}'.format(match.get('href')))
                     # Remove URL fragments
                     u = match.get('href').split("#")[0]
                     urls.append(u)
@@ -141,12 +141,10 @@ class WebMentions(SignalHandler):
         
         # don't ping absolute links to own domain
         if dest.startswith(self.site.config['SITE_URL']):
-            self.logger.info('Refusing to ping self for {0}'.format(dest))
             return False
         
         # Skip relative links
         if not dest.startswith("http://") and not dest.startswith("https://"):
-            self.logger.info('Skipped relative dest {0}'.format(dest))
             return False
         
         # Check for a webmention endpoint
@@ -154,7 +152,6 @@ class WebMentions(SignalHandler):
         
         if not ep:
             return False
-        
         
         # Now we actually send the webmention
         #
@@ -167,13 +164,12 @@ class WebMentions(SignalHandler):
                 "target" : dest
             }
         
-        self.logger.info('Sending WebMention to {0}'.format(ep))
+        self.logger.info('Sending WebMention to {0} for {1}'.format(ep, dest))
         r = session.post(ep, data=data)
         if r.status_code not in [200, 201, 204]:
             self.logger.info('Received {0}'.format(r.status_code))
             return False
         
-        self.logger.info('Sending WebMention Succeeded')
         return True
     
     
@@ -188,7 +184,6 @@ class WebMentions(SignalHandler):
         # Place a HEAD for the path
         r = session.head(dest)
         if r.status_code != 200:
-            self.logger.info('Request to {0} failed'.format(dest))
             return False
         
         # See if there's a Link header. 
@@ -198,8 +193,6 @@ class WebMentions(SignalHandler):
         #
         # Note2: lookup is not case-sensitive: requests will accept "Link", "link", "lINk" etc
         if "link" not in r.headers:
-            self.logger.info('No linky {0}'.format(dest))
-            
             # Pass off to the HTML link extractor
             return self.get_html_link(dest, session)
         
@@ -208,7 +201,6 @@ class WebMentions(SignalHandler):
             mention_link = self.check_link_header_for_webmention(link_h)
             if mention_link:
                 # found one
-                self.logger.info('Found {0}'.format(mention_link))
                 return mention_link
 
         # If we reached this point, there was no webmention header
@@ -217,7 +209,7 @@ class WebMentions(SignalHandler):
         #
         # It's true that there's a call to this earlier
         # but this isn't a mistake
-        # it may be that there were non-webmention link headers
+        # it may be that there were non-webmention link headers returned
         return self.get_html_link(dest, r, session)
             
             
@@ -227,13 +219,11 @@ class WebMentions(SignalHandler):
         # Fetch the link
         r = session.get(dest)
         if r.status_code != 200:
-            self.logger.info('GET Request to {0} failed'.format(dest))
             return False
 
         # ensure the linked dest *is* HTML
         if "content-type" not in r.headers or "html" not in r.headers["content-type"].lower():
             # Not HTML, don't bother
-            self.logger.info('Skip non-HTML {0}'.format(dest))
             return False
 
         # Feed into lxml
@@ -249,7 +239,6 @@ class WebMentions(SignalHandler):
         
         # Do it
         for match in tree.xpath(xpath_q):
-            self.logger.info('Found {0}'.format(match.get('href')))
             # Don't return empty values
             if len(match.get('href')) > 0:
                 return match.get('href')
