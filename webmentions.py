@@ -104,9 +104,9 @@ class WebMentions(SignalHandler):
         # Map out element types and the attributes we're looking for
         # keep it simple to begin with
         #
-        # TODO: Add some
         attribs = {
-            "href" : ["a"]
+            "href" : ["a", "area"],
+            "cite" : ["blockquote"]
             }
         
         urls = []
