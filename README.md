@@ -2,7 +2,7 @@
 
 This is a deployment [SignalHandler](https://www.getnikola.com/extending.html#signalhandler-plugins) plugin for Nikola which looks for links in newly updated posts/pages, performs WebMention discovery on the link destination and attempts to send a [WebMention](https://indieweb.org/Webmention-developer#Protocol_Summary).
 
-It can only *send* WebMentions, it cannot *receive* because doing so would require a dynamic stack. A service like [webmentions.io](https://webmentions.io) can be used for receiving.
+It can only *send* WebMentions, it cannot *receive* because doing so would require a dynamic stack. A service like [webmention.io](https://webmention.io) can be used for receiving.
 
 ----
 
