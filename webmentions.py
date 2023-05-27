@@ -184,7 +184,14 @@ class WebMentions(SignalHandler):
         data = {"source": ownlink, "target": dest}
 
         self.logger.info("Sending WebMention to {0} for {1}".format(ep, dest))
-        r = session.post(ep, data=data)
+        try:
+            r = session.post(ep, data=data)
+        except Exception as e:
+            # Something unexpected happened
+            self.logger.info("Exception {0}".format(e))
+            return False, True
+
+            
         if r.status_code not in [200, 201, 202, 204]:
             self.logger.info("Received {0}".format(r.status_code))
             return False, True
@@ -200,7 +207,12 @@ class WebMentions(SignalHandler):
         """
 
         # Place a HEAD for the path
-        r = session.head(dest)
+        try:
+            r = session.head(dest)
+        except:
+            # Connection failed, whether SSL or otherwise
+            return False
+        
         if r.status_code != 200:
             return False
 
@@ -233,7 +245,12 @@ class WebMentions(SignalHandler):
     def get_html_link(self, dest, session):
         """Fetch a destination link and extra webmention tags if present"""
         # Fetch the link
-        r = session.get(dest)
+        try:
+            r = session.get(dest)
+        except:
+            # Connection failed, whether SSL or otherwise
+            return False
+        
         if r.status_code != 200:
             return False
 
