@@ -37,4 +37,4 @@ However, a lot of WebMention supporting software allow the *type* of mention to 
 
 ### License
 
-Copyright (c) 2022 B Tasker, released under [MIT License](https://choosealicense.com/licenses/mit/)
+Copyright (c) 2023 B Tasker, released under [MIT License](https://choosealicense.com/licenses/mit/)
